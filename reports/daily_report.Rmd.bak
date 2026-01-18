@@ -1,0 +1,344 @@
+---
+title: "📊 Current Information Daily Report"
+subtitle: "Real-time data dashboard updated daily"
+author: "Auto-Generated Report"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    theme: darkly
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+    self_contained: yes
+    fig_width: 10
+    fig_height: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(plotly)
+
+# Suppress output during setup
+options(width = 100)
+```
+
+## 🌟 Dashboard Overview
+
+This report provides a real-time snapshot of current information from multiple public APIs. All data is fetched automatically each time the report is generated.
+
+**Report Generated:** `r format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")`
+
+---
+
+## 🔭 Astronomy Picture of the Day
+
+```{r astronomy}
+# Fetch APOD
+apod_url <- "https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY"
+
+apod_data <- tryCatch({
+  response <- GET(apod_url, timeout(10))
+  if (status_code(response) == 200) {
+    fromJSON(content(response, as = "text"))
+  } else {
+    NULL
+  }
+}, error = function(e) {
+  NULL
+})
+
+if (!is.null(apod_data)) {
+  cat("**Title:** ", apod_data$title, "\n\n")
+  cat("**Date:** ", apod_data$date, "\n\n")
+  
+  # Display image if available
+  if (!is.null(apod_data$url) && grepl("\\.(jpg|jpeg|png|gif)$", apod_data$url, ignore.case = TRUE)) {
+    cat("![APOD Image](", apod_data$url, ")\n\n")
+  }
+  
+  cat("**Explanation:**\n\n", apod_data$explanation, "\n\n")
+  cat("*Source: NASA APOD API*")
+} else {
+  cat("❌ Unable to fetch APOD data at this time.")
+}
+```
+
+---
+
+## 🌤️ Current Weather
+
+```{r weather}
+# Fetch current weather for New York
+weather_url <- "https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&timezone=auto"
+
+weather_data <- tryCatch({
+  response <- GET(weather_url, timeout(10))
+  if (status_code(response) == 200) {
+    fromJSON(content(response, as = "text"))
+  } else {
+    NULL
+  }
+}, error = function(e) {
+  NULL
+})
+
+if (!is.null(weather_data)) {
+  current <- weather_data$current
+  
+  # Create weather display
+  weather_df <- data.frame(
+    Metric = c("Temperature", "Wind Speed", "Humidity", "Location", "Last Updated"),
+    Value = c(
+      paste0(current$temperature_2m, " °C"),
+      paste0(current$wind_speed_10m, " km/h"),
+      paste0(current$relative_humidity_2m, " %"),
+      "New York (USA)",
+      current$time
+    )
+  )
+  
+  kable(weather_df, format = "html") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("❌ Unable to fetch weather data at this time.")
+}
+```
+
+---
+
+## 💰 Cryptocurrency Prices & Chart
+
+```{r crypto}
+# Fetch crypto prices
+crypto_url <- "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,cardano&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true"
+
+crypto_data <- tryCatch({
+  response <- GET(crypto_url, timeout(10))
+  if (status_code(response) == 200) {
+    fromJSON(content(response, as = "text"))
+  } else {
+    NULL
+  }
+}, error = function(e) {
+  NULL
+})
+
+if (!is.null(crypto_data)) {
+  # Transform to data frame
+  crypto_df <- data.frame(
+    Coin = c(),
+    Price = c(),
+    Market_Cap = c(),
+    "24h_Volume" = c(),
+    "24h_Change" = c(),
+    check.names = FALSE
+  )
+  
+  crypto_prices <- c()
+  
+  for (coin in names(crypto_data)) {
+    coin_data <- crypto_data[[coin]]
+    change_24h <- coin_data$usd_24h_change
+    change_icon <- if (!is.null(change_24h)) {
+      if (change_24h >= 0) paste0("📈 +", round(change_24h, 2)) else paste0("📉 ", round(change_24h, 2))
+    } else "N/A"
+    
+    crypto_df <- rbind(crypto_df, data.frame(
+      Coin = toupper(coin),
+      Price = paste0("$", format(coin_data$usd, big.mark = ",")),
+      Market_Cap = paste0("$", format(round(coin_data$usd_market_cap / 1e9, 2), big.mark = ","), "B"),
+      "24h_Volume" = paste0("$", format(round(coin_data$usd_24h_vol / 1e9, 2), big.mark = ","), "B"),
+      "24h_Change" = change_icon,
+      check.names = FALSE
+    ))
+    
+    crypto_prices <- c(crypto_prices, coin_data$usd)
+  }
+  
+  kable(crypto_df, format = "html", align = "c") %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+  
+  cat("\n\n")
+  
+  # Create price comparison chart
+  price_chart_df <- data.frame(
+    Cryptocurrency = names(crypto_data),
+    Price_USD = sapply(crypto_data, function(x) x$usd)
+  )
+  
+  p <- ggplot(price_chart_df, aes(x = reorder(Cryptocurrency, -Price_USD), y = Price_USD, fill = Cryptocurrency)) +
+    geom_col(show.legend = FALSE) +
+    scale_fill_manual(values = c("bitcoin" = "#F7931A", "ethereum" = "#627EEA", "cardano" = "#0033CC")) +
+    labs(
+      title = "Cryptocurrency Price Comparison",
+      x = "Cryptocurrency",
+      y = "Price (USD)",
+      subtitle = paste("Updated:", format(Sys.time(), "%H:%M:%S"))
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      axis.text.y = element_text(size = 11),
+      panel.grid.major.x = element_blank()
+    )
+  
+  print(p)
+} else {
+  cat("❌ Unable to fetch cryptocurrency data at this time.")
+}
+```
+
+---
+
+## ⏰ Time & Timezone Information
+
+```{r timezone}
+# Fetch time for multiple timezones
+timezones <- c("America/New_York", "Europe/London", "Asia/Tokyo", "Australia/Sydney")
+timezone_data_list <- list()
+
+for (tz in timezones) {
+  url <- sprintf("https://worldtimeapi.org/api/timezone/%s", tz)
+  
+  tryCatch({
+    response <- GET(url, timeout(10))
+    if (status_code(response) == 200) {
+      timezone_data_list[[tz]] <- fromJSON(content(response, as = "text"))
+    }
+  }, error = function(e) {
+    NULL
+  })
+}
+
+if (length(timezone_data_list) > 0) {
+  tz_df <- data.frame(
+    Timezone = c(),
+    Current_Time = c(),
+    UTC_Offset = c(),
+    Week_Number = c()
+  )
+  
+  for (tz_name in names(timezone_data_list)) {
+    tz_data <- timezone_data_list[[tz_name]]
+    tz_df <- rbind(tz_df, data.frame(
+      Timezone = tz_name,
+      Current_Time = format(as.POSIXct(tz_data$datetime), "%H:%M:%S"),
+      UTC_Offset = tz_data$utc_offset,
+      Week_Number = tz_data$week_number
+    ))
+  }
+  
+  kable(tz_df, format = "html", align = "c") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"))
+} else {
+  cat("❌ Unable to fetch timezone data at this time.")
+}
+```
+
+---
+
+## 💡 Fun Fact of the Day
+
+```{r facts}
+# Fetch random fact
+facts_url <- "https://uselessfacts.jsph.pl/random.json?language=en"
+
+facts_data <- tryCatch({
+  response <- GET(facts_url, timeout(10))
+  if (status_code(response) == 200) {
+    fromJSON(content(response, as = "text"))
+  } else {
+    NULL
+  }
+}, error = function(e) {
+  NULL
+})
+
+if (!is.null(facts_data)) {
+  cat("> **", facts_data$text, "**\n\n")
+  cat("*Source: Useless Facts API*")
+} else {
+  cat("❌ Unable to fetch fact data at this time.")
+}
+```
+
+---
+
+## 🎉 Today's Holidays
+
+```{r holidays}
+# Fetch holidays for today
+year <- format(Sys.Date(), "%Y")
+today <- format(Sys.Date(), "%Y-%m-%d")
+holidays_url <- sprintf("https://date.nager.at/api/v3/PublicHolidays/%s/US", year)
+
+holidays_data <- tryCatch({
+  response <- GET(holidays_url, timeout(10))
+  if (status_code(response) == 200) {
+    fromJSON(content(response, as = "text"))
+  } else {
+    NULL
+  }
+}, error = function(e) {
+  NULL
+})
+
+if (!is.null(holidays_data)) {
+  # Find today's holidays
+  todays_holidays <- Filter(function(h) h$date == today, holidays_data)
+  
+  if (length(todays_holidays) > 0) {
+    cat("🎊 **Today is a holiday!**\n\n")
+    for (holiday in todays_holidays) {
+      cat("- ", holiday$name, " (", holiday$date, ")\n")
+    }
+  } else {
+    cat("📅 No public holidays today in the United States.\n")
+  }
+  
+  # Show next upcoming holiday
+  upcoming <- Filter(function(h) h$date > today, holidays_data)
+  if (length(upcoming) > 0) {
+    next_holiday <- upcoming[[1]]
+    days_until <- as.numeric(difftime(as.Date(next_holiday$date), Sys.Date(), units = "days"))
+    cat("\n**Next holiday:** ", next_holiday$name, " (", next_holiday$date, " - ", days_until, " days away)\n")
+  }
+} else {
+  cat("❌ Unable to fetch holidays data at this time.")
+}
+```
+
+---
+
+## 📊 Report Metadata
+
+```{r metadata}
+metadata_df <- data.frame(
+  Property = c("Report Generated", "System Time", "R Version", "Report Format"),
+  Value = c(
+    format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
+    Sys.timezone(),
+    paste0("R ", R.version$major, ".", R.version$minor),
+    "R Markdown HTML"
+  )
+)
+
+kable(metadata_df, format = "html") %>%
+  kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
+```
+
+---
+
+**How to update this report:**
+1. Open a terminal in the project directory
+2. Run: `Rscript render_report.R`
+3. Open `daily_report.html` in your browser
+
+To automate daily updates, see `QUARTO_REPORT_PLAN.md` for scheduling options.

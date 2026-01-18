@@ -1,0 +1,679 @@
+---
+title: "Current Information Daily Report"
+subtitle: "Real-time data dashboard with interactive visualizations"
+author: "Auto-Generated Report"
+date: today
+format:
+  html:
+    theme: darkly
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    embed-resources: true
+    fig-width: 12
+    fig-height: 6
+    page-layout: full
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(plotly)
+library(scales)
+
+# Load modularized API functions
+source("../R/aggregator.R")
+
+# Load visualization functions
+source("../R/visualizations.R")
+
+# Fetch all data in one call
+all_data <- fetch_all_data()
+```
+
+## Dashboard Overview
+
+This report provides a real-time snapshot of current information from multiple public APIs with interactive visualizations. All data is fetched automatically each time the report is generated.
+
+**Report Generated:** `r format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")`  
+**Data Fetched:** `r format(all_data$fetch_timestamp, "%Y-%m-%d %H:%M:%S %Z")`
+
+---
+
+## Astronomy Picture of the Day
+
+```{r astronomy}
+if (all_data$astronomy$status == "success") {
+  apod <- all_data$astronomy$data
+  
+  cat("### ", apod$title, "\n\n")
+  cat("**Date:** ", apod$date, "\n\n")
+  
+  # Display image if available and is a standard image format
+  if (!is.null(apod$url) && grepl("\\.(jpg|jpeg|png|gif)$", apod$url, ignore.case = TRUE)) {
+    cat("![APOD Image](", apod$url, ")\n\n")
+  }
+  
+  cat("**Explanation:**\n\n", apod$explanation, "\n\n")
+  
+  if (!is.null(apod$copyright)) {
+    cat("*Credit: ", apod$copyright, "*\n\n")
+  }
+  
+  cat("*Source: NASA APOD API*")
+} else {
+  cat("Unable to fetch APOD data:", all_data$astronomy$error)
+}
+```
+
+---
+
+## Current Weather
+
+### Temperature Gauge
+
+```{r weather_gauge}
+if (all_data$weather$status == "success") {
+  weather <- all_data$weather$data
+  
+  # Display temperature gauge
+  plot_weather_gauge(weather, title = paste0("Weather in ", weather$location))
+} else {
+  cat("Unable to fetch weather data:", all_data$weather$error)
+}
+```
+
+### Weather Details
+
+```{r weather_table}
+if (all_data$weather$status == "success") {
+  weather <- all_data$weather$data
+  weather_card <- create_weather_card(weather)
+  
+  weather_df <- data.frame(
+    Metric = c("Location", "Temperature", "Feels Like", "Wind Speed", "Humidity", "Condition"),
+    Value = c(
+      weather_card$location,
+      weather_card$temperature,
+      weather_card$apparent_temperature,
+      weather_card$wind_speed,
+      weather_card$humidity,
+      weather_card$emoji
+    )
+  )
+  
+  kable(weather_df, format = "html", caption = "Current Weather Details") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to fetch weather data:", all_data$weather$error)
+}
+```
+
+---
+
+## Cryptocurrency Prices
+
+### Interactive Price Chart
+
+```{r crypto_chart}
+if (all_data$crypto$status == "success") {
+  crypto <- all_data$crypto$data
+  
+  # Display interactive plotly chart
+  plot_crypto_prices(crypto)
+} else {
+  cat("Unable to fetch cryptocurrency data:", all_data$crypto$error)
+}
+```
+
+### Crypto Summary Table
+
+```{r crypto_table}
+if (all_data$crypto$status == "success") {
+  crypto <- all_data$crypto$data
+  crypto_table <- create_crypto_card(crypto)
+  
+  kable(crypto_table, format = "html", caption = "Cryptocurrency Quick Reference") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to display crypto summary")
+}
+```
+
+---
+
+## World Time Zones
+
+### Interactive World Clock
+
+```{r world_clock_visual, results='asis'}
+if (all_data$time$new_york$status == "success" && all_data$time$london$status == "success" && all_data$time$tokyo$status == "success") {
+  world_clock_html <- create_world_clock(all_data$time)
+  cat(world_clock_html)
+} else {
+  cat("Unable to fetch timezone data")
+}
+```
+
+### Time Zone Details
+
+```{r timezones}
+time_ny <- all_data$time$new_york
+time_london <- all_data$time$london
+time_tokyo <- all_data$time$tokyo
+
+if (time_ny$status == "success" && time_london$status == "success" && time_tokyo$status == "success") {
+  times_table <- create_world_clock_table(all_data$time)
+  
+  kable(times_table, format = "html", caption = "World Time Zones") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to fetch timezone data")
+}
+```
+
+---
+
+## Fun Fact of the Day
+
+```{r facts}
+if (all_data$facts$status == "success") {
+  fact <- all_data$facts$data
+  
+  cat("> **", fact$text, "**\n\n")
+  cat("*Source: ", fact$source_url, "*")
+} else {
+  cat("Unable to fetch random fact:", all_data$facts$error)
+}
+```
+
+---
+
+## Today's Holidays
+
+```{r holidays}
+if (all_data$holidays$status == "success") {
+  holidays <- all_data$holidays$data
+  
+  if (holidays$is_holiday_today) {
+    cat("### Today is a Holiday!\n\n")
+    for (holiday in holidays$todays_holidays) {
+      cat("- **", holiday$name, "**\n")
+    }
+  } else {
+    cat("No holidays today in ", holidays$country_code)
+  }
+} else {
+  cat("Unable to fetch holiday data:", all_data$holidays$error)
+}
+```
+
+---
+
+## Fun & Inspiration 🎉
+
+### Inspirational Quote
+
+```{r inspirational_quote}
+if (all_data$public_apis$inspirational_quote$status == "success") {
+  quote_data <- all_data$public_apis$inspirational_quote$data
+  cat("> **\"", quote_data$quote, "\"**\n\n")
+  cat("— ", quote_data$author, "\n")
+} else {
+  cat("Unable to fetch inspirational quote")
+}
+```
+
+### Programming Quote
+
+```{r programming_quote}
+if (all_data$public_apis$programming_quote$status == "success") {
+  quote_data <- all_data$public_apis$programming_quote$data
+  cat("> **\"", quote_data$quote, "\"**\n\n")
+  cat("— ", quote_data$author, "\n")
+} else {
+  cat("Unable to fetch programming quote")
+}
+```
+
+### Programming Joke 💻
+
+```{r programming_joke}
+if (all_data$public_apis$joke$status == "success") {
+  joke_data <- all_data$public_apis$joke$data
+  cat("**", joke_data$joke, "**\n")
+} else {
+  cat("Unable to fetch joke")
+}
+```
+
+---
+
+## Random Facts & Knowledge 🧠
+
+```{r facts_display}
+facts_col1 <- NULL
+facts_col2 <- NULL
+
+if (all_data$public_apis$cat_fact$status == "success") {
+  facts_col1 <- paste0("**🐱 Cat Fact:** ", all_data$public_apis$cat_fact$data$fact)
+}
+
+if (all_data$public_apis$dog_fact$status == "success") {
+  facts_col2 <- paste0("**🐕 Dog Fact:** ", all_data$public_apis$dog_fact$data$fact)
+}
+
+if (all_data$public_apis$useless_fact$status == "success") {
+  facts_col1 <- paste0("**💡 Useless Fact:** ", all_data$public_apis$useless_fact$data$fact)
+}
+
+if (all_data$public_apis$zen_quote$status == "success") {
+  facts_col2 <- paste0("**🧘 Zen Wisdom:** ", all_data$public_apis$zen_quote$data$quote)
+}
+
+if (!is.null(facts_col1)) cat(facts_col1, "\n\n")
+if (!is.null(facts_col2)) cat(facts_col2, "\n\n")
+```
+
+### Daily Advice 💡
+
+```{r daily_advice}
+if (all_data$public_apis$advice$status == "success") {
+  advice_data <- all_data$public_apis$advice$data
+  cat("**Today's Advice:** ", advice_data$advice, "\n")
+} else {
+  cat("Unable to fetch advice")
+}
+```
+
+### Random Activity to Try 🎯
+
+```{r random_activity}
+if (all_data$public_apis$activity$status == "success") {
+  activity <- all_data$public_apis$activity$data
+  cat("**Suggested Activity:** ", activity$activity, "\n\n")
+  cat("- **Type:** ", activity$type, "\n")
+  cat("- **Participants:** ", activity$participants, "\n")
+  cat("- **Cost Level:** ", activity$price, "\n")
+} else {
+  cat("Unable to fetch activity")
+}
+```
+
+### Random Wikipedia Article 📚
+
+```{r wiki_article}
+if (all_data$public_apis$wiki_article$status == "success") {
+  wiki <- all_data$public_apis$wiki_article$data
+  cat("**Today's Article:** [", wiki$title, "](", wiki$url, ")\n\n")
+  cat(wiki$extract, "...\n")
+} else {
+  cat("Unable to fetch Wikipedia article")
+}
+```
+
+---
+
+## Entertainment & Humor 🎭
+
+### Dad Jokes
+
+```{r dad_joke}
+if (all_data$entertainment_quotes$dad_joke$status == "success") {
+  joke <- all_data$entertainment_quotes$dad_joke$data
+  cat("> 😄 ", joke$joke, "\n")
+} else {
+  cat("Unable to fetch dad joke")
+}
+```
+
+### Chuck Norris Joke
+
+```{r chuck_norris_joke}
+if (all_data$entertainment_quotes$chuck_joke$status == "success") {
+  joke <- all_data$entertainment_quotes$chuck_joke$data
+  cat("> 💪 ", joke$joke, "\n")
+} else {
+  cat("Unable to fetch Chuck Norris joke")
+}
+```
+
+### Random Fact & Buzz Word
+
+```{r fun_facts_buzz}
+fact_text <- NULL
+buzz_text <- NULL
+
+if (all_data$entertainment_quotes$random_fact$status == "success") {
+  fact <- all_data$entertainment_quotes$random_fact$data
+  fact_text <- paste0("**📌 Fun Fact:** ", fact$fact)
+}
+
+if (all_data$entertainment_quotes$buzz_word$status == "success") {
+  buzz <- all_data$entertainment_quotes$buzz_word$data
+  buzz_text <- paste0("**💼 Corporate Buzz:** ", buzz$buzzword)
+}
+
+if (!is.null(fact_text)) cat(fact_text, "\n\n")
+if (!is.null(buzz_text)) cat(buzz_text, "\n")
+```
+
+---
+
+## Animals & Wildlife 🦁
+
+### Random Animal Images & Facts
+
+```{r animal_gallery}
+# Fetch various animal content
+duck_url <- if (all_data$animals$random_duck$status == "success") all_data$animals$random_duck$data$url else NULL
+fox_url <- if (all_data$animals$random_fox$status == "success") all_data$animals$random_fox$data$url else NULL
+dog_url <- if (all_data$animals$random_dog_img$status == "success") all_data$animals$random_dog_img$data$url else NULL
+
+# Display in columns if available
+if (!is.null(duck_url)) {
+  cat("::: {.column width=\"33%\"}\n")
+  cat("![Random Duck](", duck_url, "){width=150px}\n")
+  cat(":::\n")
+}
+
+if (!is.null(fox_url)) {
+  cat("::: {.column width=\"33%\"}\n")
+  cat("![Random Fox](", fox_url, "){width=150px}\n")
+  cat(":::\n")
+}
+
+if (!is.null(dog_url)) {
+  cat("::: {.column width=\"33%\"}\n")
+  cat("![Random Dog](", dog_url, "){width=150px}\n")
+  cat(":::\n")
+}
+```
+
+### Animal Facts
+
+```{r animal_facts}
+cat_text <- NULL
+dog_text <- NULL
+meow_text <- NULL
+zoo_text <- NULL
+
+if (all_data$animals$cat_fact$status == "success") {
+  cat_data <- all_data$animals$cat_fact$data
+  cat_text <- paste0("🐱 **Cat Fact:** ", cat_data$fact)
+}
+
+if (all_data$animals$dog_fact$status == "success") {
+  dog_data <- all_data$animals$dog_fact$data
+  dog_text <- paste0("🐕 **Dog Fact:** ", dog_data$fact)
+}
+
+if (all_data$animals$meow_facts$status == "success") {
+  meow_data <- all_data$animals$meow_facts$data
+  meow_text <- paste0("😺 **Meow Facts:** ", meow_data$facts)
+}
+
+if (all_data$animals$zoo_animal$status == "success") {
+  zoo_data <- all_data$animals$zoo_animal$data
+  zoo_text <- paste0("🦁 **Zoo Animal:** ", zoo_data$animal, " (", zoo_data$scientific, ") - ", zoo_data$fact)
+}
+
+if (!is.null(cat_text)) cat(cat_text, "\n\n")
+if (!is.null(dog_text)) cat(dog_text, "\n\n")
+if (!is.null(meow_text)) cat(meow_text, "\n\n")
+if (!is.null(zoo_text)) cat(zoo_text, "\n")
+```
+
+### HTTP Status Animals
+
+```{r http_status_animals}
+if (all_data$animals$http_cat$status == "success") {
+  cat("**HTTP Status: Success (200) - Cat** 🐱\n\n")
+  cat("When HTTP goes right, we get cats!\n")
+}
+```
+
+---
+
+## Games, Trivia & Pop Culture 🎮
+
+### Trivia Question
+
+```{r trivia}
+if (all_data$games_trivia$trivia_question$status == "success") {
+  trivia <- all_data$games_trivia$trivia_question$data
+  cat("## 🧠 Daily Trivia Challenge\n\n")
+  cat("**Question:** ", trivia$question, "\n\n")
+  cat("**Difficulty:** ", trivia$difficulty, "\n\n")
+  cat("**Answer:** (Hover or check source for answer)\n")
+  cat("> ", trivia$correct_answer, "\n")
+} else {
+  cat("Unable to fetch trivia question")
+}
+```
+
+### Pokemon of the Day
+
+```{r pokemon_spotlight}
+if (all_data$games_trivia$pokemon$status == "success") {
+  poke <- all_data$games_trivia$pokemon$data
+  cat("## Pokémon Spotlight\n\n")
+  cat("**Name:** ", poke$name, " (ID: ", poke$id, ")\n\n")
+  if (!is.na(poke$image) && poke$image != "Unknown") {
+    cat("![Pokemon](", poke$image, "){width=200px}\n\n")
+  }
+  cat("**Types:** ", poke$types, "\n\n")
+  cat("**Height:** ", poke$height, " | **Weight:** ", poke$weight, "\n")
+} else {
+  cat("Unable to fetch Pokemon data")
+}
+```
+
+### D&D Spell & Monster
+
+```{r dnd_showcase}
+spell_text <- NULL
+monster_text <- NULL
+
+if (all_data$games_trivia$dnd_spell$status == "success") {
+  spell <- all_data$games_trivia$dnd_spell$data
+  spell_text <- paste0(
+    "⚡ **D&D Spell:** ", spell$name, 
+    " (Level ", spell$level, ", School: ", spell$school, ")\n",
+    "**Casting Time:** ", spell$casting_time, "\n",
+    "**Effect:** ", spell$description
+  )
+}
+
+if (all_data$games_trivia$dnd_monster$status == "success") {
+  monster <- all_data$games_trivia$dnd_monster$data
+  monster_text <- paste0(
+    "👹 **D&D Monster:** ", monster$name,
+    " (CR: ", monster$cr, ", ", monster$alignment, ")\n",
+    "**Type:** ", monster$size, " ", monster$type, "\n",
+    "**HP:** ", monster$hp
+  )
+}
+
+if (!is.null(spell_text)) cat(spell_text, "\n\n")
+if (!is.null(monster_text)) cat(monster_text, "\n")
+```
+
+### Star Wars & Pop Culture
+
+```{r star_wars_xkcd}
+if (all_data$games_trivia$star_wars$status == "success") {
+  sw <- all_data$games_trivia$star_wars$data
+  cat("**Star Wars:** ", sw$name, " (", sw$resource_type, ")\n\n")
+}
+
+if (all_data$games_trivia$xkcd_comic$status == "success") {
+  xkcd <- all_data$games_trivia$xkcd_comic$data
+  cat("## XKCD Comic #", xkcd$num, ": ", xkcd$title, "\n\n")
+  cat("![XKCD Comic](", xkcd$comic_url, ")\n\n")
+  cat("*Alt Text:* ", xkcd$alt_text, "\n")
+} else {
+  cat("Unable to fetch XKCD comic")
+}
+```
+
+### Jeopardy Question
+
+```{r jeopardy}
+if (all_data$games_trivia$jeopardy_q$status == "success") {
+  jeop <- all_data$games_trivia$jeopardy_q$data
+  cat("## 🎬 Jeopardy!\n\n")
+  cat("**Category:** ", jeop$category, " | **Value:** $", jeop$value, "\n\n")
+  cat("**Question:** ", jeop$question, "\n\n")
+  cat("**Answer:** (Check for answer) | ", jeop$answer, "\n")
+} else {
+  cat("Unable to fetch Jeopardy question")
+}
+```
+
+### Studio Ghibli & Chess
+
+```{r ghibli_chess}
+if (all_data$games_trivia$ghibli_film$status == "success") {
+  ghibli <- all_data$games_trivia$ghibli_film$data
+  cat("🎬 **Studio Ghibli Film:** ", ghibli$title, 
+      " (", ghibli$release_date, ")\n",
+      "**Director:** ", ghibli$director, "\n\n")
+}
+
+if (all_data$games_trivia$chess_game$status == "success") {
+  chess <- all_data$games_trivia$chess_game$data
+  cat("♟️ **Chess Player:** [@", chess$username, "](", chess$url, ")\n")
+}
+```
+
+---
+
+## Motivational & Inspirational 🌟
+
+### Motivational Quote
+
+```{r motivation}
+if (all_data$entertainment_quotes$motivational_quote$status == "success") {
+  mot <- all_data$entertainment_quotes$motivational_quote$data
+  cat("> **\"", mot$text, "\"**\n\n")
+  cat("— ", mot$author, "\n")
+} else {
+  cat("Unable to fetch motivational quote")
+}
+```
+
+### Quotable & Zen Wisdom
+
+```{r quotable_zen}
+quote_text <- NULL
+zen_text <- NULL
+
+if (all_data$entertainment_quotes$quote_quotable$status == "success") {
+  quote <- all_data$entertainment_quotes$quote_quotable$data
+  quote_text <- paste0("> \"", quote$text, "\" — ", quote$author)
+}
+
+if (all_data$entertainment_quotes$techy_phrase$status == "success") {
+  techy <- all_data$entertainment_quotes$techy_phrase$data
+  zen_text <- paste0("💻 **Techy Phrase:** ", techy$phrase)
+}
+
+if (!is.null(quote_text)) cat(quote_text, "\n\n")
+if (!is.null(zen_text)) cat(zen_text, "\n")
+```
+
+---
+
+## Data Quality Report
+
+```{r data_quality}
+# Check status of all API calls - Comprehensive list
+status_summary <- data.frame(
+  Source = c(
+    "Astronomy", "Weather", "Crypto", "Time (NY)", "Time (London)", "Time (Tokyo)", 
+    "Facts", "Holidays", "Hacker News", "Reddit", "Wikipedia", "Quote of Day", "Word of Day",
+    "NBA Scores", "F1 Standings", "TV Shows", "Movies", "Music Charts",
+    # Entertainment & Quotes
+    "Quotable Quote", "Dad Joke", "Chuck Norris", "Random Joke", "Random Fact",
+    "Buzz Word", "Techy Phrase", "Motivational Quote",
+    # Animals
+    "Cat Fact", "Dog Fact", "Random Duck", "Random Fox", "Random Dog", 
+    "Meow Facts", "HTTP Cat", "Shibe", "Zoo Animal",
+    # Games & Trivia
+    "Trivia Question", "Pokemon", "D&D Spell", "D&D Monster", "Star Wars",
+    "XKCD Comic", "Chess", "Ghibli Film", "Jeopardy"
+  ),
+  Status = c(
+    ifelse(all_data$astronomy$status == "success", "✅", "❌"),
+    ifelse(all_data$weather$status == "success", "✅", "❌"),
+    ifelse(all_data$crypto$status == "success", "✅", "❌"),
+    ifelse(all_data$time$new_york$status == "success", "✅", "❌"),
+    ifelse(all_data$time$london$status == "success", "✅", "❌"),
+    ifelse(all_data$time$tokyo$status == "success", "✅", "❌"),
+    ifelse(all_data$facts$status == "success", "✅", "❌"),
+    ifelse(all_data$holidays$status == "success", "✅", "❌"),
+    ifelse(all_data$news$hacker_news$status == "success", "✅", "❌"),
+    ifelse(all_data$news$reddit$status == "success", "✅", "❌"),
+    ifelse(all_data$news$wikipedia$status == "success", "✅", "❌"),
+    ifelse(all_data$news$quote$status == "success", "✅", "❌"),
+    ifelse(all_data$news$word$status == "success", "✅", "❌"),
+    ifelse(all_data$sports$nba$status == "success", "✅", "❌"),
+    ifelse(all_data$sports$f1$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment$tv$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment$movie$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment$music$status == "success", "✅", "❌"),
+    # Entertainment & Quotes
+    ifelse(all_data$entertainment_quotes$quote_quotable$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment_quotes$dad_joke$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment_quotes$chuck_joke$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment_quotes$random_joke$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment_quotes$random_fact$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment_quotes$buzz_word$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment_quotes$techy_phrase$status == "success", "✅", "❌"),
+    ifelse(all_data$entertainment_quotes$motivational_quote$status == "success", "✅", "❌"),
+    # Animals
+    ifelse(all_data$animals$cat_fact$status == "success", "✅", "❌"),
+    ifelse(all_data$animals$dog_fact$status == "success", "✅", "❌"),
+    ifelse(all_data$animals$random_duck$status == "success", "✅", "❌"),
+    ifelse(all_data$animals$random_fox$status == "success", "✅", "❌"),
+    ifelse(all_data$animals$random_dog_img$status == "success", "✅", "❌"),
+    ifelse(all_data$animals$meow_facts$status == "success", "✅", "❌"),
+    ifelse(all_data$animals$http_cat$status == "success", "✅", "❌"),
+    ifelse(all_data$animals$shibe$status == "success", "✅", "❌"),
+    ifelse(all_data$animals$zoo_animal$status == "success", "✅", "❌"),
+    # Games & Trivia
+    ifelse(all_data$games_trivia$trivia_question$status == "success", "✅", "❌"),
+    ifelse(all_data$games_trivia$pokemon$status == "success", "✅", "❌"),
+    ifelse(all_data$games_trivia$dnd_spell$status == "success", "✅", "❌"),
+    ifelse(all_data$games_trivia$dnd_monster$status == "success", "✅", "❌"),
+    ifelse(all_data$games_trivia$star_wars$status == "success", "✅", "❌"),
+    ifelse(all_data$games_trivia$xkcd_comic$status == "success", "✅", "❌"),
+    ifelse(all_data$games_trivia$chess_game$status == "success", "✅", "❌"),
+    ifelse(all_data$games_trivia$ghibli_film$status == "success", "✅", "❌"),
+    ifelse(all_data$games_trivia$jeopardy_q$status == "success", "✅", "❌")
+  ),
+  check.names = FALSE
+)
+
+kable(status_summary, format = "html", caption = "📊 Comprehensive API Fetch Status Report") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+# Success rate
+total_apis <- nrow(status_summary)
+successful <- sum(grepl("✅", status_summary$Status))
+success_pct <- round((successful / total_apis) * 100, 1)
+cat("\n**Overall Success Rate:**", successful, "/", total_apis, "APIs (", success_pct, "%)\n")
+```
+
+---
+
+*Report generated automatically with interactive visualizations. See project documentation for more information.*

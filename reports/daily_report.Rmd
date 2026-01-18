@@ -1,0 +1,348 @@
+---
+title: "📊 Current Information Daily Report"
+subtitle: "Real-time data dashboard updated daily"
+author: "Auto-Generated Report"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    theme: darkly
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+    self_contained: yes
+    fig_width: 10
+    fig_height: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.width = 12, fig.height = 6)
+
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(plotly)
+library(scales)
+library(here)
+
+# Load modularized API functions
+source(here("R", "aggregator.R"))
+
+# Load visualization functions
+source(here("R", "visualizations.R"))
+
+# Use prefetched data when provided (render_report passes it)
+all_data <- if (exists("prefetched_data") && !is.null(prefetched_data)) {
+  prefetched_data
+} else {
+  fetch_all_data()
+}
+```
+
+## Dashboard Overview
+
+This report provides a real-time snapshot of current information from multiple public APIs. All data is fetched automatically each time the report is generated.
+
+**Report Generated:** `r format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")`  
+**Data Fetched:** `r format(all_data$fetch_timestamp, "%Y-%m-%d %H:%M:%S %Z")`
+
+---
+
+## Astronomy Picture of the Day
+
+```{r astronomy}
+if (all_data$astronomy$status == "success") {
+  apod <- all_data$astronomy$data
+  
+  cat("**Title:** ", apod$title, "\n\n")
+  cat("**Date:** ", apod$date, "\n\n")
+  
+  # Display image if available and is a standard image format
+  if (!is.null(apod$url) && grepl("\\.(jpg|jpeg|png|gif)$", apod$url, ignore.case = TRUE)) {
+    cat("![APOD Image](", apod$url, ")\n\n")
+  }
+  
+  cat("**Explanation:**\n\n", apod$explanation, "\n\n")
+  
+  if (!is.null(apod$copyright)) {
+    cat("*Credit: ", apod$copyright, "*\n\n")
+  }
+  
+  cat("*Source: NASA APOD API*")
+} else {
+  cat("Unable to fetch APOD data:", all_data$astronomy$error)
+}
+```
+
+---
+
+## Current Weather
+
+```{r weather_gauge}
+if (all_data$weather$status == "success") {
+  weather <- all_data$weather$data
+  
+  # Display temperature gauge
+  plot_weather_gauge(weather, title = paste0("Weather in ", weather$location))
+} else {
+  cat("Unable to fetch weather data:", all_data$weather$error)
+}
+```
+
+### Weather Details
+
+```{r weather_table}
+if (all_data$weather$status == "success") {
+  weather <- all_data$weather$data
+  weather_card <- create_weather_card(weather)
+  
+  weather_df <- data.frame(
+    Metric = c("Location", "Temperature", "Feels Like", "Wind Speed", "Humidity", "Condition"),
+    Value = c(
+      weather_card$location,
+      weather_card$temperature,
+      weather_card$apparent_temperature,
+      weather_card$wind_speed,
+      weather_card$humidity,
+      weather_card$emoji
+    )
+  )
+  
+  kable(weather_df, format = "html", caption = "Current Weather Details") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to fetch weather data:", all_data$weather$error)
+}
+```
+
+---
+
+## Cryptocurrency Prices
+
+```{r crypto}
+if (all_data$crypto$status == "success") {
+  crypto <- all_data$crypto$data
+  
+  # Display interactive plotly chart
+  plot_crypto_prices(crypto)
+} else {
+  cat("Unable to fetch cryptocurrency data:", all_data$crypto$error)
+}
+```
+
+### Crypto Summary Table
+
+```{r crypto_table}
+if (all_data$crypto$status == "success") {
+  crypto <- all_data$crypto$data
+  crypto_table <- create_crypto_card(crypto)
+  
+  kable(crypto_table, format = "html", caption = "Cryptocurrency Quick Reference") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to display crypto summary")
+}
+```
+
+---
+
+## World Time Zones
+
+### Interactive World Clock
+
+```{r world_clock_visual, results='asis'}
+if (all_data$time$new_york$status == "success" && all_data$time$london$status == "success" && all_data$time$tokyo$status == "success") {
+  world_clock_html <- create_world_clock(all_data$time)
+  cat(world_clock_html)
+} else {
+  cat("Unable to fetch timezone data")
+}
+```
+
+### Time Zone Details
+
+```{r timezones}
+# Get time data from multiple timezones
+time_ny <- all_data$time$new_york
+time_london <- all_data$time$london
+time_tokyo <- all_data$time$tokyo
+
+if (time_ny$status == "success" && time_london$status == "success" && time_tokyo$status == "success") {
+  times_table <- create_world_clock_table(all_data$time)
+  
+  kable(times_table, format = "html", caption = "World Time Zones") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to fetch timezone data")
+}
+```
+
+---
+
+## News & Trending
+
+### Hacker News Top Stories
+
+```{r hacker_news}
+if (all_data$news$hacker_news$status == "success") {
+  hn_table <- create_hacker_news_table(all_data$news$hacker_news$data)
+  
+  kable(hn_table, format = "html", caption = "Top Stories from Hacker News") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to fetch Hacker News:", all_data$news$hacker_news$error)
+}
+```
+
+### Reddit Trending
+
+```{r reddit}
+if (all_data$news$reddit$status == "success") {
+  reddit_table <- create_reddit_table(all_data$news$reddit$data)
+  
+  kable(reddit_table, format = "html", caption = "Top Posts from Reddit") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to fetch Reddit data:", all_data$news$reddit$error)
+}
+```
+
+### Wikipedia Featured Article
+
+```{r wikipedia}
+if (all_data$news$wikipedia$status == "success") {
+  wiki <- format_wikipedia_article(all_data$news$wikipedia$data)
+  
+  cat("### ", wiki$title, "\n\n")
+  
+  if (!is.na(wiki$thumbnail) && wiki$thumbnail != "") {
+    cat("![", wiki$title, "](", wiki$thumbnail, ")\n\n", sep = "")
+  }
+  
+  cat(wiki$extract, "...\n\n")
+  cat("[Read more on Wikipedia](", wiki$url, ")\n\n", sep = "")
+} else {
+  cat("Unable to fetch Wikipedia article:", all_data$news$wikipedia$error)
+}
+```
+
+---
+
+## Daily Inspiration
+
+### Quote of the Day
+
+```{r quote}
+if (all_data$news$quote$status == "success") {
+  quote_text <- format_quote_display(all_data$news$quote$data)
+  cat(quote_text)
+} else {
+  cat("Unable to fetch quote:", all_data$news$quote$error)
+}
+```
+
+### Word of the Day
+
+```{r word}
+if (all_data$news$word$status == "success") {
+  word_table <- format_word_display(all_data$news$word$data)
+  
+  kable(word_table, format = "html", caption = "Learn a New Word") %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("Unable to fetch word:", all_data$news$word$error)
+}
+```
+
+---
+
+## Fun Fact of the Day
+
+```{r facts}
+if (all_data$facts$status == "success") {
+  fact <- all_data$facts$data
+  
+  cat("> **", fact$text, "**\n\n")
+  cat("*Source: ", fact$source_url, "*")
+} else {
+  cat("Unable to fetch random fact:", all_data$facts$error)
+}
+```
+
+---
+
+## Today's Holidays
+
+```{r holidays}
+if (all_data$holidays$status == "success") {
+  holidays <- all_data$holidays$data
+  
+  if (isTRUE(holidays$is_holiday_today)) {
+    cat("### Today is a Holiday!\n\n")
+    for (holiday in holidays$todays_holidays) {
+      cat("- **", holiday$name, "**\n")
+    }
+  } else {
+    cat("No holidays today in ", holidays$country_code)
+  }
+} else {
+  cat("Unable to fetch holiday data:", all_data$holidays$error)
+}
+```
+
+---
+
+## Data Quality Report
+
+```{r data_quality}
+# Check status of all API calls
+status_summary <- data.frame(
+  Source = c("Astronomy", "Weather", "Crypto", "Time (NY)", "Time (London)", "Time (Tokyo)", 
+             "Facts", "Holidays", "Hacker News", "Reddit", "Wikipedia", "Quote", "Word"),
+  Status = c(
+    ifelse(all_data$astronomy$status == "success", "Success", "Failed"),
+    ifelse(all_data$weather$status == "success", "Success", "Failed"),
+    ifelse(all_data$crypto$status == "success", "Success", "Failed"),
+    ifelse(all_data$time$new_york$status == "success", "Success", "Failed"),
+    ifelse(all_data$time$london$status == "success", "Success", "Failed"),
+    ifelse(all_data$time$tokyo$status == "success", "Success", "Failed"),
+    ifelse(all_data$facts$status == "success", "Success", "Failed"),
+    ifelse(all_data$holidays$status == "success", "Success", "Failed"),
+    ifelse(all_data$news$hacker_news$status == "success", "Success", "Failed"),
+    ifelse(all_data$news$reddit$status == "success", "Success", "Failed"),
+    ifelse(all_data$news$wikipedia$status == "success", "Success", "Failed"),
+    ifelse(all_data$news$quote$status == "success", "Success", "Failed"),
+    ifelse(all_data$news$word$status == "success", "Success", "Failed")
+  ),
+  `Timestamp` = c(
+    format(all_data$astronomy$timestamp, "%H:%M:%S"),
+    format(all_data$weather$timestamp, "%H:%M:%S"),
+    format(all_data$crypto$timestamp, "%H:%M:%S"),
+    format(all_data$time$new_york$timestamp, "%H:%M:%S"),
+    format(all_data$time$london$timestamp, "%H:%M:%S"),
+    format(all_data$time$tokyo$timestamp, "%H:%M:%S"),
+    format(all_data$facts$timestamp, "%H:%M:%S"),
+    format(all_data$holidays$timestamp, "%H:%M:%S"),
+    format(all_data$news$hacker_news$timestamp, "%H:%M:%S"),
+    format(all_data$news$reddit$timestamp, "%H:%M:%S"),
+    format(all_data$news$wikipedia$timestamp, "%H:%M:%S"),
+    format(all_data$news$quote$timestamp, "%H:%M:%S"),
+    format(all_data$news$word$timestamp, "%H:%M:%S")
+  ),
+  check.names = FALSE
+)
+
+kable(status_summary, format = "html", caption = "API Fetch Status") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+# Success rate
+total_apis <- 13
+successful <- sum(status_summary$Status == "Success")
+cat("\n**Overall Success Rate:**", successful, "/", total_apis, "APIs")
+```
+
+---
+
+*Report generated automatically. See project documentation for more information.*

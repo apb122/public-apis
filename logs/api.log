@@ -1,0 +1,12 @@
+INFO [2026-01-18 02:36:03] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 02:40:40] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 02:41:56] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 02:42:29] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 02:42:34] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 02:43:11] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 02:44:26] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 02:53:09] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 02:55:23] Fetching NASA APOD from https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY
+INFO [2026-01-18 03:01:10] Fetching Cat Fact from https://catfact.ninja/fact
+INFO [2026-01-18 03:01:10] Fetching Chuck Norris from https://api.chucknorris.io/jokes/random
+INFO [2026-01-18 03:01:19] Fetching Debug Cat Fact from https://catfact.ninja/fact
