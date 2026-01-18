@@ -85,9 +85,23 @@ fetch_all_data <- function(timestamp = Sys.time(), refresh = TRUE) {
   dir.create(here("logs"), showWarnings = FALSE, recursive = TRUE)
   log_appender(appender_tee(here("logs", "api.log")))
 
-  # Parallel execution enabled for 40+ APIs (8 workers for speed)
-  # If you experience issues on Windows, set workers to 4 or use plan(sequential)
-  plan(multisession, workers = CONFIG$api$parallel_workers)
+  # Parallel execution setup with safe fallback for Windows
+  workers <- tryCatch(CONFIG$api$parallel_workers, error = function(...) 4)
+  old_plan <- future::plan()
+  on.exit({
+    try(future::plan(old_plan), silent = TRUE)
+  }, add = TRUE)
+
+  if (identical(Sys.getenv("CID_SEQUENTIAL"), "1") || workers <= 1) {
+    future::plan(future::sequential)
+  } else {
+    tryCatch({
+      future::plan(future::multisession, workers = workers)
+    }, error = function(e) {
+      message("Parallel plan failed (", e$message, "); falling back to sequential")
+      future::plan(future::sequential)
+    })
+  }
 
   # Optional caching for rate-limited APIs
   cache_ttl <- tryCatch(CONFIG$api$cache_ttl, error = function(...) 900)
@@ -160,7 +174,7 @@ fetch_all_data <- function(timestamp = Sys.time(), refresh = TRUE) {
   
   results <- furrr::future_map(api_calls, function(call) {
     result <- tryCatch({
-      safe_execute(call$fn, source_name = call$name)
+      future::with_timeout(30, safe_execute(call$fn, source_name = call$name))
     }, error = function(e) {
       # If parallel execution fails, return error result
       new_api_result(
@@ -174,7 +188,7 @@ fetch_all_data <- function(timestamp = Sys.time(), refresh = TRUE) {
     result
   }, .options = furrr::furrr_options(
     seed = TRUE,
-    packages = c("logger", "httr2", "jsonlite", "purrr", "checkmate"),
+    packages = c("logger", "httr2", "jsonlite", "purrr", "checkmate", "future"),
     globals = TRUE  # Automatically detect and export all required objects
   ))
   

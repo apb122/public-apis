@@ -39,6 +39,29 @@ all_data <- if (exists("prefetched_data") && !is.null(prefetched_data)) {
 } else {
   fetch_all_data()
 }
+
+# Validate data structure and add defaults for missing components
+if (is.null(all_data)) stop("No data available")
+
+# Ensure all expected top-level components exist with error status if missing
+required_components <- c("astronomy", "weather", "crypto", "facts", "holidays", "fetch_timestamp", 
+                         "time", "news", "sports", "entertainment")
+for (comp in required_components) {
+  if (is.null(all_data[[comp]])) {
+    if (comp == "fetch_timestamp") {
+      all_data[[comp]] <- Sys.time()
+    } else if (comp %in% c("time", "news", "sports", "entertainment")) {
+      all_data[[comp]] <- list()
+    } else {
+      all_data[[comp]] <- list(status = "error", data = NULL, error = "Component not available", timestamp = Sys.time())
+    }
+  }
+}
+
+# Helper: safely check if result is success
+is_api_success <- function(result) {
+  !is.null(result) && is.list(result) && identical(result$status, "success")
+}
 ```
 
 ## Dashboard Overview
@@ -276,7 +299,7 @@ if (all_data$facts$status == "success") {
 ## Today's Holidays
 
 ```{r holidays}
-if (all_data$holidays$status == "success") {
+if (is_api_success(all_data$holidays)) {
   holidays <- all_data$holidays$data
   
   if (isTRUE(holidays$is_holiday_today)) {
@@ -297,39 +320,49 @@ if (all_data$holidays$status == "success") {
 ## Data Quality Report
 
 ```{r data_quality}
-# Check status of all API calls
+# Check status of all API calls - safely handle missing components
+get_status <- function(result) {
+  if (is.null(result) || !is.list(result)) return("N/A")
+  result$status %||% "N/A"
+}
+
+get_timestamp <- function(result) {
+  if (is.null(result) || !is.list(result)) return(Sys.time())
+  result$timestamp %||% Sys.time()
+}
+
 status_summary <- data.frame(
   Source = c("Astronomy", "Weather", "Crypto", "Time (NY)", "Time (London)", "Time (Tokyo)", 
              "Facts", "Holidays", "Hacker News", "Reddit", "Wikipedia", "Quote", "Word"),
   Status = c(
-    ifelse(all_data$astronomy$status == "success", "Success", "Failed"),
-    ifelse(all_data$weather$status == "success", "Success", "Failed"),
-    ifelse(all_data$crypto$status == "success", "Success", "Failed"),
-    ifelse(all_data$time$new_york$status == "success", "Success", "Failed"),
-    ifelse(all_data$time$london$status == "success", "Success", "Failed"),
-    ifelse(all_data$time$tokyo$status == "success", "Success", "Failed"),
-    ifelse(all_data$facts$status == "success", "Success", "Failed"),
-    ifelse(all_data$holidays$status == "success", "Success", "Failed"),
-    ifelse(all_data$news$hacker_news$status == "success", "Success", "Failed"),
-    ifelse(all_data$news$reddit$status == "success", "Success", "Failed"),
-    ifelse(all_data$news$wikipedia$status == "success", "Success", "Failed"),
-    ifelse(all_data$news$quote$status == "success", "Success", "Failed"),
-    ifelse(all_data$news$word$status == "success", "Success", "Failed")
+    ifelse(get_status(all_data$astronomy) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$weather) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$crypto) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$time$new_york) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$time$london) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$time$tokyo) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$facts) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$holidays) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$news$hacker_news) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$news$reddit) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$news$wikipedia) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$news$quote) == "success", "Success", "Failed"),
+    ifelse(get_status(all_data$news$word) == "success", "Success", "Failed")
   ),
   `Timestamp` = c(
-    format(all_data$astronomy$timestamp, "%H:%M:%S"),
-    format(all_data$weather$timestamp, "%H:%M:%S"),
-    format(all_data$crypto$timestamp, "%H:%M:%S"),
-    format(all_data$time$new_york$timestamp, "%H:%M:%S"),
-    format(all_data$time$london$timestamp, "%H:%M:%S"),
-    format(all_data$time$tokyo$timestamp, "%H:%M:%S"),
-    format(all_data$facts$timestamp, "%H:%M:%S"),
-    format(all_data$holidays$timestamp, "%H:%M:%S"),
-    format(all_data$news$hacker_news$timestamp, "%H:%M:%S"),
-    format(all_data$news$reddit$timestamp, "%H:%M:%S"),
-    format(all_data$news$wikipedia$timestamp, "%H:%M:%S"),
-    format(all_data$news$quote$timestamp, "%H:%M:%S"),
-    format(all_data$news$word$timestamp, "%H:%M:%S")
+    format(get_timestamp(all_data$astronomy), "%H:%M:%S"),
+    format(get_timestamp(all_data$weather), "%H:%M:%S"),
+    format(get_timestamp(all_data$crypto), "%H:%M:%S"),
+    format(get_timestamp(all_data$time$new_york), "%H:%M:%S"),
+    format(get_timestamp(all_data$time$london), "%H:%M:%S"),
+    format(get_timestamp(all_data$time$tokyo), "%H:%M:%S"),
+    format(get_timestamp(all_data$facts), "%H:%M:%S"),
+    format(get_timestamp(all_data$holidays), "%H:%M:%S"),
+    format(get_timestamp(all_data$news$hacker_news), "%H:%M:%S"),
+    format(get_timestamp(all_data$news$reddit), "%H:%M:%S"),
+    format(get_timestamp(all_data$news$wikipedia), "%H:%M:%S"),
+    format(get_timestamp(all_data$news$quote), "%H:%M:%S"),
+    format(get_timestamp(all_data$news$word), "%H:%M:%S")
   ),
   check.names = FALSE
 )

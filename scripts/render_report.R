@@ -174,14 +174,26 @@ render_report <- function(project_root, pre_fetched_data = NULL) {
     print_substep("Using pre-fetched data")
   }
   
-  # Render
-  output_path <- rmarkdown::render(
-    input = report_path,
-    output_file = output_file,
-    output_dir = output_dir,
-    envir = render_env,
-    quiet = TRUE
-  )
+  # Render with error details
+  output_path <- tryCatch({
+    rmarkdown::render(
+      input = report_path,
+      output_file = output_file,
+      output_dir = output_dir,
+      envir = render_env,
+      quiet = FALSE  # Show errors for debugging
+    )
+  }, error = function(e) {
+    print_header("RENDER ERROR DETAILS")
+    cat(sprintf("Error class: %s\n", class(e)[1]))
+    cat(sprintf("Message: %s\n\n", e$message))
+    if (!is.null(e$call)) {
+      cat(sprintf("Call: %s\n", deparse(e$call)))
+    }
+    cat("\nFull traceback:\n")
+    print(traceback())
+    stop(e)
+  })
   
   return(output_path)
 }
@@ -192,6 +204,11 @@ render_report <- function(project_root, pre_fetched_data = NULL) {
 
 main <- function() {
   start_time <- Sys.time()
+  
+  # Force sequential execution by default (disable with --parallel)
+  if (identical(Sys.getenv("CID_SEQUENTIAL"), "")) {
+    Sys.setenv(CID_SEQUENTIAL = "1")
+  }
   
   # Parse arguments
   args <- commandArgs(trailingOnly = TRUE)
