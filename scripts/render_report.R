@@ -197,6 +197,8 @@ main <- function() {
   args <- commandArgs(trailingOnly = TRUE)
   force_refresh <- "--force-refresh" %in% args
   skip_test <- "--skip-test" %in% args
+  parallel_enabled <- "--parallel" %in% args
+  if (parallel_enabled) Sys.setenv(CID_SEQUENTIAL = "0")
   
   print_header("Daily Report Renderer")
   
